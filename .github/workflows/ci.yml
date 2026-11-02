@@ -327,7 +327,6 @@ jobs:
       - gitleaks
       - security-checks
       - npm-audit
-      - semgrep
       - codeql
       - sonarqube
 
