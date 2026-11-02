@@ -262,12 +262,12 @@ jobs:
 
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
 
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v6
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -276,3 +276,197 @@ jobs:
             -Dsonar.projectKey=securetask
             -Dsonar.sources=src
             -Dsonar.qualitygate.wait=true
+
+  # --------------------------------------------------
+  # 7. qualtiy gate
+  # --------------------------------------------------
+
+  quality-gate:
+    name: Security Quality Gate
+    runs-on: ubuntu-latest
+
+    if: always()
+
+    needs:
+      - build-and-test
+      - gitleaks
+      - security-checks
+      - npm-audit
+      - semgrep
+      - codeql
+      - sonarqube
+
+    steps:
+      - name: Check results
+        run: |
+          echo "Checking pipeline results..."
+
+          if [[ "${{ needs.build-and-test.result }}" != "success" ||
+                "${{ needs.gitleaks.result }}" != "success" ||
+                "${{ needs.security-checks.result }}" != "success" ||
+                "${{ needs.npm-audit.result }}" != "success" ||
+                "${{ needs.semgrep.result }}" != "success" ||
+                "${{ needs.codeql.result }}" != "success" ||
+                "${{ needs.sonarqube.result }}" != "success" ]]; then
+            echo "Security quality gate failed!"
+            exit 1
+          fi
+
+          echo "All checks passed!"
+
+  # --------------------------------------------------
+  # 7. Docker Build, Security Scan, SBOM & Push
+  # --------------------------------------------------
+  docker-release:
+    name: Docker Build, Security Scan, SBOM & Push
+    runs-on: ubuntu-latest
+
+    # Wait for all existing quality and security jobs.
+    needs:
+      - build-and-test
+      - gitleaks
+      - security-checks
+      - npm-audit
+      - semgrep
+      - codeql
+      - sonarqube
+
+    permissions:
+      contents: read
+
+    env:
+      IMAGE_NAME: securetask
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+    steps:
+      # --------------------------------------
+      # 1. Checkout
+      # --------------------------------------
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # --------------------------------------
+      # 2. Build Docker image
+      # --------------------------------------
+      - name: Build Docker image
+        run: |
+          docker build \
+            --pull \
+            --tag "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}" \
+            .
+
+      # --------------------------------------
+      # 3. Install Trivy
+      # --------------------------------------
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" \
+            | sudo tee /etc/apt/sources.list.d/trivy.list
+
+          sudo apt-get update -y
+          sudo apt-get install -y trivy
+
+          trivy --version
+
+      # --------------------------------------
+      # 4. Generate Trivy JSON report
+      # --------------------------------------
+      - name: Generate Trivy image report
+        run: |
+          trivy image \
+            --scanners vuln \
+            --format json \
+            --output trivy-image-report.json \
+            "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}"
+
+      # --------------------------------------
+      # 5. Enforce vulnerability policy
+      # --------------------------------------
+      - name: Trivy vulnerability gate
+        run: |
+          trivy image \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}"
+
+      # --------------------------------------
+      # 6. Install Syft
+      # --------------------------------------
+      - name: Install Syft
+        run: |
+          curl -sSfL https://get.anchore.io/syft \
+            | sudo sh -s -- -b /usr/local/bin
+
+          syft version
+
+      # --------------------------------------
+      # 7. Generate SBOM
+      # --------------------------------------
+      - name: Generate SBOM
+        run: |
+          syft "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}" \
+            -o spdx-json=securetask-sbom.spdx.json \
+            -o cyclonedx-json=securetask-sbom.cyclonedx.json
+
+      # --------------------------------------
+      # 8. Upload reports
+      # --------------------------------------
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: securetask-security-reports
+          path: |
+            trivy-image-report.json
+            securetask-sbom.spdx.json
+            securetask-sbom.cyclonedx.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      # --------------------------------------
+      # 9. Docker Hub login
+      # --------------------------------------
+      - name: Login to Docker Hub
+        if: success() && github.event_name != 'pull_request'
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "$DOCKERHUB_TOKEN" | docker login \
+            --username "$DOCKERHUB_USERNAME" \
+            --password-stdin
+
+      # --------------------------------------
+      # 10. Push image
+      # --------------------------------------
+      - name: Push versioned image
+        if: success() && github.event_name != 'pull_request'
+        run: |
+          docker push "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}"
+
+      # --------------------------------------
+      # 11. Push latest on main
+      # --------------------------------------
+      - name: Tag and push latest
+        if: success() && github.ref == 'refs/heads/main'
+        run: |
+          docker tag \
+            "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}" \
+            "$DOCKERHUB_USERNAME/$IMAGE_NAME:latest"
+
+          docker push "$DOCKERHUB_USERNAME/$IMAGE_NAME:latest"
+
+      # --------------------------------------
+      # 12. Logout
+      # --------------------------------------
+      - name: Logout from Docker Hub
+        if: always() && github.event_name != 'pull_request'
+        run: docker logout
