@@ -75,18 +75,20 @@ jobs:
   # 1. Trivy - SECRET SCANNING
   # ---------------------------------------------------
   
-  Security-cheks:
+  Security-checks:
     name: Trivy FS Scan
-		run-on: ubuntu-latest
-		
+    runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v4
+
       - name: Trivy installation
         run: |
-          sudo apt-get install wget gnupg
+          sudo apt-get install wget gnupg -y
           wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
           echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
           sudo apt-get update -y
           sudo apt-get install trivy -y
+
       - name: Trivy FS Scan
-        run: trivy fs --fomat table -o fs-report.json .
+        run: trivy fs --format json -o fs-report.json .
