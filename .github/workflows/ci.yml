@@ -50,3 +50,43 @@ jobs:
 
       - name: Run Tests
         run: npm test
+
+  # --------------------------------------------------
+  # 1. GITLEAKS - SECRET SCANNING
+  # --------------------------------------------------
+
+  gitleaks:
+    name: 1. Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+		  
+
+  # --------------------------------------------------
+  # 1. Trivy - SECRET SCANNING
+  # ---------------------------------------------------
+  
+  Security-cheks:
+    name: Trivy FS Scan
+		run-on: ubuntu-latest
+		
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy installation
+        run: |
+          sudo apt-get install wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update -y
+          sudo apt-get install trivy -y
+      - name: Trivy FS Scan
+        run: trivy fs --fomat table -o fs-report.json .
