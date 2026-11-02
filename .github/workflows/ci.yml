@@ -178,37 +178,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install semgrep
       # << I found • Findings: 15 (15 blocking)• Rules run: 240 • Targets scanned: 10>>>
-      # - name: Run Semgrep SAST
-      #   run: |
-      #     semgrep scan \
-      #       --config auto \
-      #       --error \
-      #       --json \
-      #       --output semgrep-report.json \
-      #       .
-
-      # - name: Upload Semgrep Report
-      #   if: always()
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: semgrep-sast-report
-      #     path: semgrep-report.json
-      #     if-no-files-found: warn
-      #     retention-days: 7
       - name: Run Semgrep SAST
         run: |
           semgrep scan \
             --config auto \
+            --error \
             --json \
             --output semgrep-report.json \
             .
-
-      - name: Display Semgrep Findings
-        if: always()
-        run: |
-          if [ -f semgrep-report.json ]; then
-            python -m json.tool semgrep-report.json
-          fi
 
       - name: Upload Semgrep Report
         if: always()
@@ -218,6 +195,29 @@ jobs:
           path: semgrep-report.json
           if-no-files-found: warn
           retention-days: 7
+      # - name: Run Semgrep SAST
+      #   run: |
+      #     semgrep scan \
+      #       --config auto \
+      #       --json \
+      #       --output semgrep-report.json \
+      #       .
+
+      # - name: Display Semgrep Findings
+      #   if: always()
+      #   run: |
+      #     if [ -f semgrep-report.json ]; then
+      #       python -m json.tool semgrep-report.json
+      #     fi
+
+      # - name: Upload Semgrep Report
+      #   if: always()
+      #   uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      #   with:
+      #     name: semgrep-sast-report
+      #     path: semgrep-report.json
+      #     if-no-files-found: warn
+      #     retention-days: 7
   # --------------------------------------------------
   # 6. GITHUB CODEQL - CODE SECURITY ANALYSIS
   # --------------------------------------------------
