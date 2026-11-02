@@ -317,18 +317,20 @@ jobs:
   # --------------------------------------------------
   # 7. Docker Build, Security Scan, SBOM & Push
   # --------------------------------------------------
+ 
   docker-release:
     name: Docker Build, Security Scan, SBOM & Push
     runs-on: ubuntu-latest
 
-    # Wait for all existing quality and security jobs.
     needs:
       - build-and-test
       - gitleaks
       - security-checks
       - npm-audit
       - codeql
-      # - sonarqube
+      #- sonarqube
+      # Add security-quality-gate here too if this is a separate job
+      # in your workflow.
 
     permissions:
       contents: read
@@ -338,13 +340,11 @@ jobs:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
     steps:
-      # --------------------------------------
       # 1. Checkout
-      # --------------------------------------
       - name: Checkout source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-
+      # 2. Validate Docker Hub configuration
       - name: Validate Docker Hub configuration
         shell: bash
         run: |
@@ -353,27 +353,27 @@ jobs:
             exit 1
           fi
 
-          if [[ ! "$DOCKERHUB_USERNAME" =~ ^[a-z0-9]+([._-][a-z0-9]+)*$ ]]; then
-            echo "::error::DOCKERHUB_USERNAME has an invalid format"
+          if [[ "$DOCKERHUB_USERNAME" =~ [[:space:]] ]]; then
+            echo "::error::Docker Hub username contains whitespace"
             exit 1
           fi
 
-          echo "Docker Hub username validation passed"
+          if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "::error::DOCKERHUB_TOKEN secret is missing"
+            exit 1
+          fi
 
+          echo "Docker Hub configuration validation passed"
 
-
-      # --------------------------------------
-      # 2. Build Docker image
-      # --------------------------------------
+      # 3. Build image
       - name: Build Docker image
+        shell: bash
         run: |
-          IMAGE="$DOCKERHUB_USERNAME/$IMAGE_NAME:$GITHUB_SHA"
-          echo "Building image: $IMAGE"
+          IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${GITHUB_SHA}"
+          echo "Building Docker image"
           docker build --pull --tag "$IMAGE" .
 
-      # --------------------------------------
-      # 3. Install Trivy
-      # --------------------------------------
+      # 4. Install Trivy
       - name: Install Trivy
         run: |
           sudo apt-get update
@@ -386,25 +386,20 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" \
             | sudo tee /etc/apt/sources.list.d/trivy.list
 
-          sudo apt-get update -y
+          sudo apt-get update
           sudo apt-get install -y trivy
-
           trivy --version
 
-      # --------------------------------------
-      # 4. Generate Trivy JSON report
-      # --------------------------------------
+      # 5. Generate Trivy report
       - name: Generate Trivy image report
         run: |
           trivy image \
             --scanners vuln \
             --format json \
             --output trivy-image-report.json \
-            "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}"
+            "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${GITHUB_SHA}"
 
-      # --------------------------------------
-      # 5. Enforce vulnerability policy
-      # --------------------------------------
+      # 6. Vulnerability gate
       - name: Trivy vulnerability gate
         run: |
           trivy image \
@@ -412,30 +407,23 @@ jobs:
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
             --exit-code 1 \
-            "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}"
+            "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${GITHUB_SHA}"
 
-      # --------------------------------------
-      # 6. Install Syft
-      # --------------------------------------
+      # 7. Install Syft
       - name: Install Syft
         run: |
           curl -sSfL https://get.anchore.io/syft \
             | sudo sh -s -- -b /usr/local/bin
-
           syft version
 
-      # --------------------------------------
-      # 7. Generate SBOM
-      # --------------------------------------
+      # 8. Generate SBOM
       - name: Generate SBOM
         run: |
-          syft "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}" \
+          syft "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${GITHUB_SHA}" \
             -o spdx-json=securetask-sbom.spdx.json \
             -o cyclonedx-json=securetask-sbom.cyclonedx.json
 
-      # --------------------------------------
-      # 8. Upload reports
-      # --------------------------------------
+      # 9. Upload reports
       - name: Upload security reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -448,9 +436,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      # --------------------------------------
-      # 9. Docker Hub login
-      # --------------------------------------
+      # 10. Docker Hub login
       - name: Login to Docker Hub
         if: success() && github.event_name != 'pull_request'
         env:
@@ -460,29 +446,25 @@ jobs:
             --username "$DOCKERHUB_USERNAME" \
             --password-stdin
 
-      # --------------------------------------
-      # 10. Push image
-      # --------------------------------------
+      # 11. Push versioned image
       - name: Push versioned image
         if: success() && github.event_name != 'pull_request'
         run: |
-          docker push "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}"
+          docker push \
+            "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${GITHUB_SHA}"
 
-      # --------------------------------------
-      # 11. Push latest on main
-      # --------------------------------------
+      # 12. Push latest only from main
       - name: Tag and push latest
         if: success() && github.ref == 'refs/heads/main'
         run: |
           docker tag \
-            "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}" \
-            "$DOCKERHUB_USERNAME/$IMAGE_NAME:latest"
+            "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${GITHUB_SHA}" \
+            "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
 
-          docker push "$DOCKERHUB_USERNAME/$IMAGE_NAME:latest"
+          docker push "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
 
-      # --------------------------------------
-      # 12. Logout
-      # --------------------------------------
+      # 13. Logout
       - name: Logout from Docker Hub
         if: always() && github.event_name != 'pull_request'
         run: docker logout
+
