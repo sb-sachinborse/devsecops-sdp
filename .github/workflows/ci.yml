@@ -344,15 +344,32 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+
+      - name: Validate Docker Hub configuration
+        shell: bash
+        run: |
+          if [ -z "$DOCKERHUB_USERNAME" ]; then
+            echo "::error::DOCKERHUB_USERNAME secret is missing"
+            exit 1
+          fi
+
+          if [[ ! "$DOCKERHUB_USERNAME" =~ ^[a-z0-9]+([._-][a-z0-9]+)*$ ]]; then
+            echo "::error::DOCKERHUB_USERNAME has an invalid format"
+            exit 1
+          fi
+
+          echo "Docker Hub username validation passed"
+
+
+
       # --------------------------------------
       # 2. Build Docker image
       # --------------------------------------
       - name: Build Docker image
         run: |
-          docker build \
-            --pull \
-            --tag "$DOCKERHUB_USERNAME/$IMAGE_NAME:${GITHUB_SHA}" \
-            .
+          IMAGE="$DOCKERHUB_USERNAME/$IMAGE_NAME:$GITHUB_SHA"
+          echo "Building image: $IMAGE"
+          docker build --pull --tag "$IMAGE" .
 
       # --------------------------------------
       # 3. Install Trivy
@@ -421,7 +438,7 @@ jobs:
       # --------------------------------------
       - name: Upload security reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: securetask-security-reports
           path: |
