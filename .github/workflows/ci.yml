@@ -1,3 +1,4 @@
+
 name: SecureTask CI Pipeline
 
 on:
@@ -21,15 +22,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # --------------------------------------------------
+  # 1. BUILD AND TEST
+  # --------------------------------------------------
 
   build-and-test:
-
     name: Build and Test
-
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout Source Code
         uses: actions/checkout@v7
 
@@ -52,43 +53,67 @@ jobs:
         run: npm test
 
   # --------------------------------------------------
-  # 1. GITLEAKS - SECRET SCANNING
+  # 2. GITLEAKS - SECRET SCANNING
   # --------------------------------------------------
 
   gitleaks:
-    name: 1. Gitleaks Secret Scan
+    name: Gitleaks Secret Scan
     runs-on: ubuntu-latest
+    needs: build-and-test
 
     steps:
-      - name: Checkout source code
+      - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Scan repository for secrets
+      - name: Scan Repository for Secrets
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-		  
 
   # --------------------------------------------------
-  # 1. Trivy - SECRET SCANNING
-  # ---------------------------------------------------
-  
-  Security-checks:
-    name: Trivy FS Scan
+  # 3. TRIVY - FILESYSTEM SECURITY SCANNING
+  # --------------------------------------------------
+
+  security-checks:
+    name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
-    
+    needs: gitleaks
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
 
-      - name: Trivy installation
+      - name: Install Trivy
         run: |
-          sudo apt-get install wget gnupg -y
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update -y
-          sudo apt-get install trivy -y
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
 
-      - name: Trivy FS Scan
-        run: trivy fs --format json -o fs-report.json .
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" \
+            | sudo tee /etc/apt/sources.list.d/trivy.list
+
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Trivy Filesystem Scan
+        run: |
+          trivy fs \
+            --scanners vuln,secret,misconfig \
+            --severity HIGH,CRITICAL \
+            --format json \
+            --output fs-report.json \
+            .
+
+      - name: Upload Trivy Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-filesystem-report
+          path: fs-report.json
+          if-no-files-found: warn
+          retention-days: 7
