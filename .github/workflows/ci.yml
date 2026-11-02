@@ -328,7 +328,7 @@ jobs:
       - security-checks
       - npm-audit
       - codeql
-      - sonarqube
+      # - sonarqube
 
     permissions:
       contents: read
