@@ -328,7 +328,7 @@ jobs:
       - security-checks
       - npm-audit
       - codeql
-      #- sonarqube
+      - sonarqube
       # Add security-quality-gate here too if this is a separate job
       # in your workflow.
 
