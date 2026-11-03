@@ -1,3 +1,4 @@
+
 # ==========================================
 # Stage 1: Install dependencies
 # ==========================================
@@ -46,19 +47,28 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Copy production dependencies
 COPY --from=production-deps --chown=node:node \
     /app/node_modules ./node_modules
 
+# Copy application files
 COPY --chown=node:node package.json ./
 COPY --chown=node:node src ./src
 COPY --chown=node:node views ./views
 COPY --chown=node:node public ./public
 
-# Require successful tests before building runtime
+# Require successful tests
 COPY --from=test /tmp/tests-passed /tmp/tests-passed
 
+# Remove npm and npx from runtime image
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    /usr/local/bin/npm \
+    /usr/local/bin/npx
+
+# Run as non-root user
 USER node
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Start application without npm
+CMD ["node", "src/server.js"]
