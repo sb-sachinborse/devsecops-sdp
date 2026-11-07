@@ -295,6 +295,7 @@ jobs:
       - semgrep
       - codeql
       - sonarqube
+      - checkov
 
     steps:
       - name: Check results
@@ -307,7 +308,8 @@ jobs:
                 "${{ needs.npm-audit.result }}" != "success" ||
                 "${{ needs.semgrep.result }}" != "success" ||
                 "${{ needs.codeql.result }}" != "success" ||
-                "${{ needs.sonarqube.result }}" != "success" ]]; then
+                "${{ needs.sonarqube.result }}" != "success" ||
+                "${{ needs.checkov.result }}" != "success" ]]; then
             echo "Security quality gate failed!"
             exit 1
           fi
@@ -327,8 +329,11 @@ jobs:
       - gitleaks
       - security-checks
       - npm-audit
+      - semgrep
       - codeql
       - sonarqube
+      - checkov
+      - quality-gate
       # Add security-quality-gate here too if this is a separate job
       # in your workflow.
 
@@ -467,4 +472,45 @@ jobs:
       - name: Logout from Docker Hub
         if: always() && github.event_name != 'pull_request'
         run: docker logout
+
+
+  # --------------------------------------------------
+  # CHECKOV - DOCKERFILE SECURITY SCANNING
+  # --------------------------------------------------
+
+  checkov:
+    name: Checkov Dockerfile Scan
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+          ## use chekov version 3.4.3 coz my local checkov version is same.
+      - name: Install Checkov
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install checkov==3.4.3  
+          checkov --version
+
+      - name: Checkov Dockerfile Scan
+        run: |
+          checkov \
+            --file Dockerfile \
+            --framework dockerfile \
+            --output json > checkov-dockerfile-report.json
+
+      - name: Upload Checkov Report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: checkov-dockerfile-report
+          path: checkov-dockerfile-report.json
+          if-no-files-found: warn
+          retention-days: 7
 
