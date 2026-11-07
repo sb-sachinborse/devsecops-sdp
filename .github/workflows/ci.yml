@@ -502,6 +502,7 @@ jobs:
         if: success() && github.event_name != 'pull_request'
         env:
           IMAGE_DIGEST: ${{ steps.push_image.outputs.digest }}
+          COSIGN_EXPERIMENTAL: "1"
         run: |
           IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}@${IMAGE_DIGEST}"
 
@@ -514,6 +515,7 @@ jobs:
         if: success() && github.event_name != 'pull_request'
         env:
           IMAGE_DIGEST: ${{ steps.push_image.outputs.digest }}
+          COSIGN_EXPERIMENTAL: "1"
         run: |
           IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}@${IMAGE_DIGEST}"
 
@@ -526,6 +528,7 @@ jobs:
         if: success() && github.event_name != 'pull_request'
         env:
           IMAGE_DIGEST: ${{ steps.push_image.outputs.digest }}
+          COSIGN_EXPERIMENTAL: "1"
         run: |
           IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}@${IMAGE_DIGEST}"
 
