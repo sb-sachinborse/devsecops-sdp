@@ -507,10 +507,9 @@ jobs:
 
           echo "Signing image: $IMAGE"
 
-          cosign sign --yes "$IMAGE"
+          cosign sign --registry-referrers-mode=oci-1-1 --yes "$IMAGE"
 
-
-        #Inspect published image signatures
+        # Inspect published image signatures
       - name: Inspect Cosign signature artifacts
         if: success() && github.event_name != 'pull_request'
         env:
@@ -520,7 +519,7 @@ jobs:
 
           echo "Inspecting signature artifacts for: $IMAGE"
 
-          cosign tree "$IMAGE"
+          cosign tree --registry-referrers-mode=oci-1-1 --experimental-oci11 "$IMAGE"
 
       #  Verify Docker image signature
       - name: Verify Docker image signature
@@ -531,6 +530,7 @@ jobs:
           IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}@${IMAGE_DIGEST}"
 
           cosign verify "$IMAGE" \
+            --experimental-oci11 \
             --certificate-identity-regexp '^https://github\.com/sb-sachinborse/devsecops-sdp/\.github/workflows/ci\.yml@refs/heads/(main|develop)$' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 
