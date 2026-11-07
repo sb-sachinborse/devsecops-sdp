@@ -321,7 +321,7 @@ jobs:
   # --------------------------------------------------
 
   docker-release:
-    name: Docker Build, Security Scan, SBOM & Push
+    name: Docker Build, Security Scan, SBOM , cosign & Push
     runs-on: ubuntu-latest
 
     needs:
@@ -356,7 +356,7 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
         with:
-          cosign-release: v3.1.3
+          cosign-release: v2.5.3
 
       - name: Verify Cosign installation
         run: cosign version
@@ -502,41 +502,29 @@ jobs:
         if: success() && github.event_name != 'pull_request'
         env:
           IMAGE_DIGEST: ${{ steps.push_image.outputs.digest }}
-          COSIGN_EXPERIMENTAL: "1"
         run: |
           IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}@${IMAGE_DIGEST}"
-
-          echo "Signing image: $IMAGE"
-
-          cosign sign --registry-referrers-mode=oci-1-1 --yes "$IMAGE"
+          cosign sign --yes "$IMAGE"
 
         # Inspect published image signatures
       - name: Inspect Cosign signature artifacts
         if: success() && github.event_name != 'pull_request'
         env:
           IMAGE_DIGEST: ${{ steps.push_image.outputs.digest }}
-          COSIGN_EXPERIMENTAL: "1"
         run: |
           IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}@${IMAGE_DIGEST}"
-
-          echo "Inspecting signature artifacts for: $IMAGE"
-
-          cosign tree --registry-referrers-mode=oci-1-1 --experimental-oci11 "$IMAGE"
+          cosign tree "$IMAGE"
 
       #  Verify Docker image signature
       - name: Verify Docker image signature
         if: success() && github.event_name != 'pull_request'
         env:
           IMAGE_DIGEST: ${{ steps.push_image.outputs.digest }}
-          COSIGN_EXPERIMENTAL: "1"
         run: |
           IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}@${IMAGE_DIGEST}"
-
           cosign verify "$IMAGE" \
-            --experimental-oci11 \
-            --certificate-identity-regexp '^https://github\.com/sb-sachinborse/devsecops-sdp/\.github/workflows/ci\.yml@refs/heads/(main|develop)$' \
+            --certificate-identity-regexp "^https://github\.com/${{ github.repository }}/\.github/workflows/ci\.yml@refs/heads/(main|develop)$" \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
-
       # 13. Logout
       - name: Logout from Docker Hub
         if: always() && github.event_name != 'pull_request'
