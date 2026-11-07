@@ -253,7 +253,7 @@ jobs:
   sonarqube:
     name: SonarQube Analysis
     runs-on: ubuntu-latest
-    needs: 
+    needs:
         - build-and-test
         - gitleaks
         - security-checks
@@ -317,9 +317,9 @@ jobs:
           echo "All checks passed!"
 
   # --------------------------------------------------
-  # 7. Docker Build, Security Scan, SBOM & Push
+  # 7. Docker Build, Security Scan, SBOM ,Cosign & Push
   # --------------------------------------------------
- 
+
   docker-release:
     name: Docker Build, Security Scan, SBOM & Push
     runs-on: ubuntu-latest
@@ -354,7 +354,9 @@ jobs:
 
       #Install Cosign
       - name: Install Cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+        with:
+          cosign-release: v3.1.3
 
       - name: Verify Cosign installation
         run: cosign version
@@ -559,7 +561,7 @@ jobs:
       - name: Install Checkov
         run: |
           python -m pip install --upgrade pip
-          python -m pip install checkov==3.4.3  
+          python -m pip install checkov==3.4.3
           checkov --version
 
       - name: Checkov Dockerfile Scan
