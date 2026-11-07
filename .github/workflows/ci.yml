@@ -507,6 +507,19 @@ jobs:
 
           cosign sign --yes "$IMAGE"
 
+
+        #Inspect published image signatures
+      - name: Inspect Cosign signature artifacts
+        if: success() && github.event_name != 'pull_request'
+        env:
+          IMAGE_DIGEST: ${{ steps.push_image.outputs.digest }}
+        run: |
+          IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}@${IMAGE_DIGEST}"
+
+          echo "Inspecting signature artifacts for: $IMAGE"
+
+          cosign tree "$IMAGE"
+
       #  Verify Docker image signature
       - name: Verify Docker image signature
         if: success() && github.event_name != 'pull_request'
