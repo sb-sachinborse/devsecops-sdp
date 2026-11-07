@@ -473,7 +473,7 @@ jobs:
 
           docker push "$IMAGE" | tee docker-push.log
 
-          DIGEST="$(awk '/digest: sha256:/ {print $2}' docker-push.log | tail -n 1)"
+          DIGEST="$(awk '/digest: sha256:/ {print $3}' docker-push.log | tail -n 1)"
 
           if [[ ! "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "ERROR: Unable to capture a valid image digest."
