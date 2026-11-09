@@ -29,7 +29,7 @@ Why it failed
 Your Docker output contains:
 8a8585c2695491fa05e77a37b7112f4e41a02852: digest: sha256:6933207d9133f93dc02566093251fdb9686227b1cce83593dfd257826446a241 size: 2606
 
-
+***************************************************************************
 Our original command used $2, but the digest is in field $3.
 Step 1 — Fix the digest extraction
 Open the workflow:
