@@ -612,20 +612,13 @@ curl -i http://localhost:3000/health
 
 After capturing the images, embed them in the README using Markdown:
 
-```markdown
 ### Successful CI pipeline
 <img width="1400" height="450" alt="Screenshot From 2026-11-07 16-00-13" src="https://github.com/user-attachments/assets/906d8539-0f18-4cda-8780-82d3e3036f71" />
 
 
-### Checkov results
-![Checkov results](docs/screenshots/05-checkov-healthcheck.png)
+<img width="1331" height="741" alt="Screenshot From 2026-11-03 12-24-22" src="https://github.com/user-attachments/assets/8d267751-5cfd-4664-804b-9aa63a2f1dee" />
 
-### Dockerfile health check
-![Dockerfile health check](docs/screenshots/06-dockerfile-healthcheck.png)
-
-### Cosign verification
-![Cosign verification](docs/screenshots/10-cosign-verification.png)
-```
+<img width="1703" height="822" alt="Screenshot From 2026-11-02 23-32-37" src="https://github.com/user-attachments/assets/0fb3500d-cba4-42f5-86fc-7af5615bb8f5" />
 
 Only add screenshots that you have actually captured. Do not use mock screenshots or images that imply a check passed when it did not.
 
