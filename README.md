@@ -1,4 +1,5 @@
 
+
 # SecureTask — Shift-Left DevSecOps CI/CD Pipeline
 
 [![GitHub Actions](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)](#-cicd-pipeline)
@@ -613,7 +614,8 @@ After capturing the images, embed them in the README using Markdown:
 
 ```markdown
 ### Successful CI pipeline
-![GitHub Actions successful pipeline](docs/screenshots/01-github-actions-success.png)
+<img width="1400" height="450" alt="Screenshot From 2026-11-07 16-00-13" src="https://github.com/user-attachments/assets/906d8539-0f18-4cda-8780-82d3e3036f71" />
+
 
 ### Checkov results
 ![Checkov results](docs/screenshots/05-checkov-healthcheck.png)
